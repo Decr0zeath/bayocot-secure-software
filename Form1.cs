@@ -41,7 +41,27 @@ namespace bayocot_secure_software
 
         private void BtnEncryptSend_Click(object sender, EventArgs e)
         {
-            // TODO: chunk, pad, encrypt, decrypt (Commits 4-6)
+            if (_aesKey == null)
+            {
+                MessageBox.Show("Compute the keys first.", "No key",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (string.IsNullOrEmpty(txtMessage.Text))
+            {
+                MessageBox.Show("Enter a message to send.", "No message",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var blocks = MessageProcessor.Chunk(txtMessage.Text);
+
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < blocks.Count; i++)
+                sb.AppendLine($"[{i + 1}] \"{blocks[i]}\"");
+            txtSubMessages.Text = sb.ToString();
+
+            // TODO: encryption in next commit
         }
 
         private void BtnReset_Click(object sender, EventArgs e)
