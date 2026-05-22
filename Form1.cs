@@ -1,4 +1,4 @@
-namespace bayocot_secure_software
+﻿namespace bayocot_secure_software
 {
     public partial class Form1 : Form
     {
@@ -16,68 +16,84 @@ namespace bayocot_secure_software
 
         private void BtnComputeKeys_Click(object sender, EventArgs e)
         {
-            if (!int.TryParse(txtPrivA.Text, out int privA) ||
-                !int.TryParse(txtPrivB.Text, out int privB))
+            try
             {
-                MessageBox.Show("Enter integer private keys for both users.",
-                    "Invalid input", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                if (!int.TryParse(txtPrivA.Text, out int privA) || privA < 1 || privA > 255 ||
+                    !int.TryParse(txtPrivB.Text, out int privB) || privB < 1 || privB > 255)
+                {
+                    MessageBox.Show("Private keys must be integers between 1 and 255.",
+                        "Invalid input", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                int pubA = DiffieHellman.ComputePublicValue(privA);
+                int pubB = DiffieHellman.ComputePublicValue(privB);
+                int sharedA = DiffieHellman.ComputeSharedKey(pubB, privA);
+                int sharedB = DiffieHellman.ComputeSharedKey(pubA, privB);
+
+                txtPubA.Text = pubA.ToString();
+                txtPubB.Text = pubB.ToString();
+                txtSharedKey.Text =
+                    $"A: {pubB}^{privA} mod {DiffieHellman.P} = {sharedA}   |   " +
+                    $"B: {pubA}^{privB} mod {DiffieHellman.P} = {sharedB}" +
+                    (sharedA == sharedB ? "   ✓ match" : "   ✗ MISMATCH");
+
+                _aesKey = KeyTransformer.ToAesKey(sharedA);
+                txtAesKey.Text = KeyTransformer.ToDisplayString(_aesKey) +
+                                 "   (hex: " + BitConverter.ToString(_aesKey).Replace("-", " ") + ")";
             }
-
-            int pubA = DiffieHellman.ComputePublicValue(privA);
-            int pubB = DiffieHellman.ComputePublicValue(privB);
-
-            int sharedFromA = DiffieHellman.ComputeSharedKey(pubB, privA);
-            int sharedFromB = DiffieHellman.ComputeSharedKey(pubA, privB);
-
-            txtPubA.Text = pubA.ToString();
-            txtPubB.Text = pubB.ToString();
-            txtSharedKey.Text = $"A computes: {pubB}^{privA} mod {DiffieHellman.P} = {sharedFromA}    " +
-                                $"B computes: {pubA}^{privB} mod {DiffieHellman.P} = {sharedFromB}";
-
-            // Store the AES key for later use
-            _aesKey = KeyTransformer.ToAesKey(sharedFromA);
-            txtAesKey.Text = KeyTransformer.ToDisplayString(_aesKey);
+            catch (Exception ex)
+            {
+                MessageBox.Show("Key computation failed: " + ex.Message,
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void BtnEncryptSend_Click(object sender, EventArgs e)
         {
-            if (_aesKey == null)
+            try
             {
-                MessageBox.Show("Compute the keys first.", "No key",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                if (_aesKey == null)
+                {
+                    MessageBox.Show("Compute the keys first.", "No key",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                if (string.IsNullOrEmpty(txtMessage.Text))
+                {
+                    MessageBox.Show("Enter a message to send.", "No message",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var blocks = MessageProcessor.Chunk(txtMessage.Text);
+
+                var sb = new System.Text.StringBuilder();
+                for (int i = 0; i < blocks.Count; i++)
+                {
+                    byte[] raw = System.Text.Encoding.ASCII.GetBytes(blocks[i]);
+                    string hex = BitConverter.ToString(raw).Replace("-", " ");
+                    sb.AppendLine($"[{i + 1}] \"{blocks[i]}\"  ->  {hex}");
+                }
+                txtSubMessages.Text = sb.ToString();
+
+                _lastCipher = AesEncryption.EncryptMessage(blocks, _aesKey);
+                txtEncrypted.Text = AesEncryption.ToHex(_lastCipher);
+
+                // Receiver re-derives shared key independently
+                int privB = int.Parse(txtPrivB.Text);
+                int pubA = int.Parse(txtPubA.Text);
+                int sharedAtB = DiffieHellman.ComputeSharedKey(pubA, privB);
+                byte[] keyAtB = KeyTransformer.ToAesKey(sharedAtB);
+
+                string decrypted = AesEncryption.DecryptMessage(_lastCipher, keyAtB);
+                txtDecrypted.Text = MessageProcessor.Unpad(decrypted);
             }
-            if (string.IsNullOrEmpty(txtMessage.Text))
+            catch (Exception ex)
             {
-                MessageBox.Show("Enter a message to send.", "No message",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                MessageBox.Show("Encryption/decryption failed: " + ex.Message,
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-
-            var blocks = MessageProcessor.Chunk(txtMessage.Text);
-
-            var sb = new System.Text.StringBuilder();
-            for (int i = 0; i < blocks.Count; i++)
-                sb.AppendLine($"[{i + 1}] \"{blocks[i]}\"");
-            txtSubMessages.Text = sb.ToString();
-
-            byte[] cipher = AesEncryption.EncryptMessage(blocks, _aesKey);
-            txtEncrypted.Text = AesEncryption.ToHex(cipher);
-
-            // Hold for the receiver side (Commit 6)
-            _lastCipher = cipher;
-
-            // === Receiver side ===
-            // In a real exchange this would happen on User B's machine using their
-            // own copy of the shared key. We re-derive it here just to be explicit.
-            int privB = int.Parse(txtPrivB.Text);
-            int pubA = int.Parse(txtPubA.Text);
-            int sharedAtB = DiffieHellman.ComputeSharedKey(pubA, privB);
-            byte[] keyAtB = KeyTransformer.ToAesKey(sharedAtB);
-
-            string decrypted = AesEncryption.DecryptMessage(_lastCipher, keyAtB);
-            txtDecrypted.Text = MessageProcessor.Unpad(decrypted);
         }
 
         private void BtnReset_Click(object sender, EventArgs e)
