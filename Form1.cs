@@ -12,7 +12,24 @@ namespace bayocot_secure_software
 
         private void BtnComputeKeys_Click(object sender, EventArgs e)
         {
-            // TODO: Diffie-Hellman (Commit 2)
+            if (!int.TryParse(txtPrivA.Text, out int privA) ||
+                !int.TryParse(txtPrivB.Text, out int privB))
+            {
+                MessageBox.Show("Enter integer private keys for both users.",
+                    "Invalid input", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            int pubA = DiffieHellman.ComputePublicValue(privA);
+            int pubB = DiffieHellman.ComputePublicValue(privB);
+
+            int sharedFromA = DiffieHellman.ComputeSharedKey(pubB, privA);
+            int sharedFromB = DiffieHellman.ComputeSharedKey(pubA, privB);
+
+            txtPubA.Text = pubA.ToString();
+            txtPubB.Text = pubB.ToString();
+            txtSharedKey.Text = $"A computes: {pubB}^{privA} mod {DiffieHellman.P} = {sharedFromA}    " +
+                                $"B computes: {pubA}^{privB} mod {DiffieHellman.P} = {sharedFromB}";
         }
 
         private void BtnEncryptSend_Click(object sender, EventArgs e)
