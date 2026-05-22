@@ -2,12 +2,15 @@ namespace bayocot_secure_software
 {
     public partial class Form1 : Form
     {
+        private byte[] _aesKey;
+
         public Form1()
         {
             InitializeComponent();
             this.btnComputeKeys.Click += BtnComputeKeys_Click;
             this.btnEncryptSend.Click += BtnEncryptSend_Click;
             this.btnReset.Click += BtnReset_Click;
+            
         }
 
         private void BtnComputeKeys_Click(object sender, EventArgs e)
@@ -30,6 +33,10 @@ namespace bayocot_secure_software
             txtPubB.Text = pubB.ToString();
             txtSharedKey.Text = $"A computes: {pubB}^{privA} mod {DiffieHellman.P} = {sharedFromA}    " +
                                 $"B computes: {pubA}^{privB} mod {DiffieHellman.P} = {sharedFromB}";
+
+            // Store the AES key for later use
+            _aesKey = KeyTransformer.ToAesKey(sharedFromA);
+            txtAesKey.Text = KeyTransformer.ToDisplayString(_aesKey);
         }
 
         private void BtnEncryptSend_Click(object sender, EventArgs e)
@@ -49,6 +56,7 @@ namespace bayocot_secure_software
             txtSubMessages.Clear();
             txtEncrypted.Clear();
             txtDecrypted.Clear();
+            _aesKey = null;
         }
     }
 }
