@@ -67,6 +67,17 @@ namespace bayocot_secure_software
 
             // Hold for the receiver side (Commit 6)
             _lastCipher = cipher;
+
+            // === Receiver side ===
+            // In a real exchange this would happen on User B's machine using their
+            // own copy of the shared key. We re-derive it here just to be explicit.
+            int privB = int.Parse(txtPrivB.Text);
+            int pubA = int.Parse(txtPubA.Text);
+            int sharedAtB = DiffieHellman.ComputeSharedKey(pubA, privB);
+            byte[] keyAtB = KeyTransformer.ToAesKey(sharedAtB);
+
+            string decrypted = AesEncryption.DecryptMessage(_lastCipher, keyAtB);
+            txtDecrypted.Text = MessageProcessor.Unpad(decrypted);
         }
 
         private void BtnReset_Click(object sender, EventArgs e)

@@ -49,5 +49,38 @@ namespace bayocot_secure_software
             }
             return sb.ToString().TrimEnd();
         }
+
+        public static byte[] DecryptBlock(byte[] ciphertext16, byte[] key16)
+        {
+            if (ciphertext16.Length != 16) throw new ArgumentException("Block must be 16 bytes.");
+            if (key16.Length != 16) throw new ArgumentException("Key must be 16 bytes.");
+
+            using (Aes aes = Aes.Create())
+            {
+                aes.KeySize = 128;
+                aes.Mode = CipherMode.ECB;
+                aes.Padding = PaddingMode.None;
+                aes.Key = key16;
+
+                using (var dec = aes.CreateDecryptor())
+                    return dec.TransformFinalBlock(ciphertext16, 0, ciphertext16.Length);
+            }
+        }
+
+        public static string DecryptMessage(byte[] ciphertext, byte[] key16)
+        {
+            if (ciphertext.Length % 16 != 0)
+                throw new ArgumentException("Ciphertext length must be a multiple of 16 bytes.");
+
+            var sb = new StringBuilder();
+            for (int i = 0; i < ciphertext.Length; i += 16)
+            {
+                byte[] block = new byte[16];
+                Array.Copy(ciphertext, i, block, 0, 16);
+                byte[] pt = DecryptBlock(block, key16);
+                sb.Append(Encoding.ASCII.GetString(pt));
+            }
+            return sb.ToString();
+        }
     }
 }
