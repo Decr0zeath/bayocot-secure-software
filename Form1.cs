@@ -3,6 +3,7 @@ namespace bayocot_secure_software
     public partial class Form1 : Form
     {
         private byte[] _aesKey;
+        private byte[] _lastCipher;
 
         public Form1()
         {
@@ -61,7 +62,11 @@ namespace bayocot_secure_software
                 sb.AppendLine($"[{i + 1}] \"{blocks[i]}\"");
             txtSubMessages.Text = sb.ToString();
 
-            // TODO: encryption in next commit
+            byte[] cipher = AesEncryption.EncryptMessage(blocks, _aesKey);
+            txtEncrypted.Text = AesEncryption.ToHex(cipher);
+
+            // Hold for the receiver side (Commit 6)
+            _lastCipher = cipher;
         }
 
         private void BtnReset_Click(object sender, EventArgs e)
@@ -77,6 +82,7 @@ namespace bayocot_secure_software
             txtEncrypted.Clear();
             txtDecrypted.Clear();
             _aesKey = null;
+            _lastCipher = null;
         }
     }
 }
